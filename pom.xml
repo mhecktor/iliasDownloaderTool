@@ -3,14 +3,14 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>deoldsax</groupId>
     <artifactId>Ilias</artifactId>
-    <version>v2</version>
+    <version>v2.0.1</version>
 
-	<properties>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<!-- select one for build + select plugin in IliasManager.java -->
-		<!-- supported: demo kit tueb stugge kn phtg hsf wbs ube-->
-		<project.university>ube</project.university>
-	</properties>
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- select one for build + select plugin in IliasManager.java -->
+        <!-- supported: demo kit tueb stugge kn phtg hsf wbs ube-->
+        <project.university>ube</project.university>
+    </properties>
 
     <organization>
         <name>DeOldSax</name>
@@ -84,42 +84,62 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>3.0.2</version>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.5.1</version>
                 <configuration>
-                    <archive>
-                        <index>true</index>
-                        <manifest>
-                            <addClasspath>true</addClasspath>
-                            <classpathPrefix>lib/</classpathPrefix>
-                            <mainClass>view.Dashboard</mainClass>
-                        </manifest>
-                        <manifestEntries>
-                            <Built-By></Built-By>
-                            <version>${project.version}</version>
-                        </manifestEntries>
-                    </archive>
+                    <source>1.8</source>
+                    <target>1.8</target>
                 </configuration>
             </plugin>
+
+            <!-- Shade plugin: bundles all dependencies into a single fat JAR -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <version>2.4</version>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.2.4</version>
                 <executions>
                     <execution>
-                        <id>copy</id>
-                        <phase>install</phase>
+                        <phase>package</phase>
                         <goals>
-                            <goal>copy-dependencies</goal>
+                            <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>
-                                release/IliasDownloaderTool-${project.university}-${project.version}/lib
-                            </outputDirectory>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <filters>
+                                <!-- Strip any existing manifest signature files to avoid
+                                     SecurityException when running the fat JAR -->
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <transformers>
+                                <!-- Set the main class in the fat JAR manifest -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <manifestEntries>
+                                        <Main-Class>view.Dashboard</Main-Class>
+                                        <Built-By></Built-By>
+                                        <version>${project.version}</version>
+                                    </manifestEntries>
+                                </transformer>
+                                <!-- Merge service files (e.g. logback, httpclient) so they all work -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <!-- Merge NOTICE and LICENSE files to avoid conflicts -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer">
+                                    <addHeader>false</addHeader>
+                                </transformer>
+                            </transformers>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
+
+            <!-- Antrun plugin: copies the fat JAR and zips the release folder -->
             <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <version>1.7</version>
@@ -132,24 +152,15 @@
                         <configuration>
                             <target>
                                 <copy file="target/Ilias-${project.version}.jar"
-                                      tofile="release/IliasDownloaderTool-${project.university}-${project.version}/Ilias-Downloader-Tool-${project.university}-${project.version}.jar">
+                                      tofile="release/IliasDownloaderTool-${project.version}/Ilias-Downloader-Tool-${project.version}.jar">
                                 </copy>
-                                <zip destfile="release/IliasDownloaderTool-${project.university}-${project.version}.zip"
-                                     basedir="release/IliasDownloaderTool-${project.university}-${project.version}"
+                                <zip destfile="release/IliasDownloaderTool-${project.version}.zip"
+                                     basedir="release/IliasDownloaderTool-${project.version}"
                                 />
                             </target>
                         </configuration>
                     </execution>
                 </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.5.1</version>
-                <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
-                </configuration>
             </plugin>
         </plugins>
     </build>

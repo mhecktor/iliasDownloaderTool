@@ -1,0 +1,70 @@
+name: Build Ilias Tool Downloader
+
+on:
+  push:
+    tags:
+      - '*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build with Maven 3.3.9 & Java 8.0.432.fx-zulu
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Install SDKMAN and set up Java & Maven
+        shell: bash
+        run: |
+          # Install SDKMAN
+          curl -s "https://get.sdkman.io" | bash
+
+          # Load SDKMAN into the current shell
+          source "$HOME/.sdkman/bin/sdkman-init.sh"
+
+          # Install exact Java version (Zulu FX 8)
+          sdk install java 8.0.432.fx-zulu
+
+          # Install exact Maven version
+          sdk install maven 3.3.9
+
+          # Make versions available to subsequent steps by writing to GITHUB_PATH and GITHUB_ENV
+          echo "JAVA_HOME=$HOME/.sdkman/candidates/java/current" >> $GITHUB_ENV
+          echo "MAVEN_HOME=$HOME/.sdkman/candidates/maven/current" >> $GITHUB_ENV
+          echo "$HOME/.sdkman/candidates/java/current/bin" >> $GITHUB_PATH
+          echo "$HOME/.sdkman/candidates/maven/current/bin" >> $GITHUB_PATH
+
+      - name: Verify Java and Maven versions
+        run: |
+          java -version
+          mvn -version
+
+      - name: Cache Maven local repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Build with Maven
+        run: mvn clean install 
+
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: release/IliasDownloaderTool-*/*.jar
+          retention-days: 7
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+
+          gh release create "$tag" \
+            --title="$tag" \
+            "release/IliasDownloaderTool-$tag/Ilias-Downloader-Tool-$tag.jar"
